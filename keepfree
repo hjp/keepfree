@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+use warnings;
+use strict;
+use v5.10;
+use autodie;
+
+use Filesys::Statvfs;
+
+my ($dir, $free_pct) = @ARGV;
+
+chdir $dir;
+
+for (;;) {
+    my ($bsize, $frsize, $blocks, $bfree, $bavail,
+        $files, $ffree, $favail, $flag, $namemax) = statvfs(".");
+
+    last if $bavail * 100 / $blocks > $free_pct;
+    opendir(my $dh, $dir);
+    my @files = readdir($dh);
+    @files = grep -f $_, @files;
+    @files = sort { -M $b <=> -M $a } @files;
+    printf("%.2f %s\n",  $bavail * 100 / $blocks, $files[0]);
+    unlink $files[0];
+}
