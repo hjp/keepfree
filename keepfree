@@ -4,6 +4,7 @@ use strict;
 use v5.10;
 use autodie;
 
+use File::Find;
 use Filesys::Statvfs;
 use POSIX qw(strftime);
 
@@ -21,12 +22,29 @@ for (;;) {
         $files, $ffree, $favail, $flag, $namemax) = statvfs(".");
 
     last if $bavail * 100 / $blocks > $free_pct;
-    opendir(my $dh, $dir);
-    my @files = readdir($dh);
-    @files = grep -f $_, @files;
-    @files = sort { -M $b <=> -M $a } @files;
+    my $file = oldest_file($dir);
     printf("%s %.2f %s\n",
            strftime("%Y-%m-%dT%H:%M:%S%z", localtime),
-           $bavail * 100 / $blocks, $files[0]);
-    unlink $files[0];
+           $bavail * 100 / $blocks, $file);
+    unlink $file;
+}
+
+sub oldest_file {
+    my ($dir) = @_;
+    my $oldest_age = 0;
+    my $oldest_file;
+
+    find(
+        sub {
+            return unless -f $_;
+            my $age = -M;
+            if ($age > $oldest_age) {
+                $oldest_file = $File::Find::name;
+                $oldest_age  = $age;
+            }
+        },
+        $dir
+    );
+
+    return $oldest_file;
 }
