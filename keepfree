@@ -1,37 +1,40 @@
 #!/usr/bin/perl
+use v5.12;
 use warnings;
-use strict;
-use v5.10;
 use autodie;
 
 use File::Find;
 use Filesys::Statvfs;
 use POSIX qw(strftime);
 
-my ($dir, $free_pct) = @ARGV;
-
-chdir $dir;
-
-my $today = strftime("%Y-%m-%d", localtime);
-my $logdir = "$ENV{HOME}/tmp/keepfree";
-mkdir $logdir unless -d $logdir;
-open STDOUT, ">>", "$logdir/$today";
+my ($dir, $free_pct, $interval) = @ARGV;
 
 for (;;) {
-    my ($bsize, $frsize, $blocks, $bfree, $bavail,
-        $files, $ffree, $favail, $flag, $namemax) = statvfs(".");
+    chdir $dir;
 
-    last if $bavail * 100 / $blocks > $free_pct;
-    my $file = oldest_file($dir);
-    printf("%s %.2f %s\n",
-           strftime("%Y-%m-%dT%H:%M:%S%z", localtime),
-           $bavail * 100 / $blocks, $file);
-    unlink $file;
+    my $today = strftime("%Y-%m-%d", localtime);
+    my $logdir = "$ENV{HOME}/tmp/keepfree";
+    mkdir $logdir unless -d $logdir;
+    open STDOUT, ">>", "$logdir/$today";
+
+    for (;;) {
+        my ($bsize, $frsize, $blocks, $bfree, $bavail,
+            $files, $ffree, $favail, $flag, $namemax) = statvfs(".");
+
+        last if $bavail * 100 / $blocks > $free_pct;
+        my $file = oldest_file($dir);
+        printf("%s %.2f %s\n",
+               strftime("%Y-%m-%dT%H:%M:%S%z", localtime),
+               $bavail * 100 / $blocks, $file);
+        unlink $file;
+    }
+    last unless $interval;
+    sleep($interval);
 }
 
 sub oldest_file {
     my ($dir) = @_;
-    my $oldest_age = 0;
+    my $oldest_age = '-Inf';
     my $oldest_file;
 
     find(
